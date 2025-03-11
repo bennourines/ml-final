@@ -1,18 +1,15 @@
 pipeline {
     agent any
 
-   
-    
-
-    stage('Install Dependencies') {
-    steps {
-        sh 'python3 -m venv venv'
-        sh 'chmod -R 755 venv/bin/'  
-        sh 'make install'
-        sh 'make install-sonar'
-    }
-}
-     
+    stages {
+        stage('Install Dependencies') {
+            steps {
+                sh 'python3 -m venv venv'
+                sh 'chmod -R 755 venv/bin/'  
+                sh 'make install'
+                sh 'make install-sonar'
+            }
+        }
 
         stage('Start MLflow Server') {
             steps {
@@ -29,13 +26,12 @@ pipeline {
         }
         
         stage('SonarQube Analysis') {
-    steps {
-        script {
-            
-            sh 'export PATH=$PATH:/opt/sonar-scanner/bin && make sonar'
+            steps {
+                script {
+                    sh 'export PATH=$PATH:/opt/sonar-scanner/bin && make sonar'
+                }
+            }
         }
-    }
-}
 
         stage('Run Tests') {
             steps {
@@ -45,8 +41,6 @@ pipeline {
                 '''
             }
         }
-
-        
 
         stage('Data Pipeline') {
             steps {
