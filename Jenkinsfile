@@ -4,13 +4,14 @@ pipeline {
    
     
 
-    stages {
-        stage('Install Dependencies') {
-            steps {
-                sh 'make install'
-                sh 'make install-sonar'
-            }
-        }
+    stage('Install Dependencies') {
+    steps {
+        sh 'python3 -m venv venv'
+        sh 'chmod -R 755 venv/bin/'  
+        sh 'make install'
+        sh 'make install-sonar'
+    }
+}
      
 
         stage('Start MLflow Server') {
