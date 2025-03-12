@@ -8,6 +8,7 @@ pipeline {
                 sh 'chmod -R 755 venv/bin/'  
                 sh 'make install'
                 sh 'make install-sonar'
+                sh 'venv/bin/pip install pytest'
             }
         }
 
