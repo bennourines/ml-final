@@ -40,6 +40,26 @@ pipeline {
             }
         }
 
+        stage('Start Elasticsearch and Kibana') {
+    steps {
+        sh '''
+            # Start Elasticsearch and Kibana
+            docker start elasticsearch kibana || true
+            
+            # Wait for Elasticsearch to be ready
+            echo "Waiting for Elasticsearch to start..."
+            for i in {1..30}; do
+                if curl -s http://localhost:9200 > /dev/null; then
+                    echo "Elasticsearch is up!"
+                    break
+                fi
+                echo "Waiting for Elasticsearch... ($i/30)"
+                sleep 5
+            done
+        '''
+    }
+}
+
         stage('Debug Dependencies') {
             steps {
                 sh 'venv/bin/pip list | grep urllib3'
