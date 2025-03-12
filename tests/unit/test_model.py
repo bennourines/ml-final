@@ -3,6 +3,7 @@ from unittest.mock import patch, MagicMock
 import numpy as np
 import pandas as pd
 from sklearn.ensemble import RandomForestClassifier
+from sklearn.preprocessing import OneHotEncoder
 
 
 @pytest.fixture
@@ -11,13 +12,15 @@ def mock_data():
     X_train = pd.DataFrame({
         "Account length": np.random.randint(1, 100, 20),
         "Total day minutes": np.random.uniform(0, 300, 20),
-        "International plan": np.random.choice(["yes", "no"], 20)
+        # Use 0 and 1 instead of "yes" and "no" to avoid encoding issues
+        "International plan": np.random.randint(0, 2, 20)
     })
     y_train = np.random.randint(0, 2, 20)
     X_test = pd.DataFrame({
         "Account length": np.random.randint(1, 100, 10),
         "Total day minutes": np.random.uniform(0, 300, 10),
-        "International plan": np.random.choice(["yes", "no"], 10)
+        # Use 0 and 1 instead of "yes" and "no" to avoid encoding issues
+        "International plan": np.random.randint(0, 2, 10)
     })
     y_test = np.random.randint(0, 2, 10)
     
