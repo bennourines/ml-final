@@ -26,13 +26,17 @@ pipeline {
             }
         }
         
-        stage('SonarQube Analysis') {
-            steps {
-                script {
-                    sh 'export PATH=$PATH:/opt/sonar-scanner/bin && make sonar'
-                }
-            }
-        }
+        stage('Debug Environment') {
+    steps {
+        sh 'pwd'
+        sh 'which python3'
+        sh 'python3 --version'
+        sh 'ls -la venv/bin/'
+        sh 'venv/bin/pip freeze'
+        sh 'venv/bin/python -c "import sys; print(sys.path)"'
+        sh 'find venv -name pytest -type d'
+    }
+}
 
         stage('Run Tests') {
     steps {
@@ -41,6 +45,16 @@ pipeline {
         sh 'venv/bin/python -m pytest tests/functional'
     }
 }
+        
+        stage('SonarQube Analysis') {
+            steps {
+                script {
+                    sh 'export PATH=$PATH:/opt/sonar-scanner/bin && make sonar'
+                }
+            }
+        }
+
+        
         stage('Data Pipeline') {
             steps {
                 sh 'make data'
