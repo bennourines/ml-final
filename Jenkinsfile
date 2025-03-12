@@ -37,11 +37,10 @@ pipeline {
         stage('Run Tests') {
     steps {
         sh 'venv/bin/pip install pytest'
-        sh 'venv/bin/pytest tests/unit'
-        sh 'venv/bin/pytest tests/functional'
+        sh 'venv/bin/python -m pytest tests/unit'
+        sh 'venv/bin/python -m pytest tests/functional'
     }
 }
-
         stage('Data Pipeline') {
             steps {
                 sh 'make data'
