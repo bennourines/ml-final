@@ -3,14 +3,31 @@ pipeline {
 
     stages {
         stage('Install Dependencies') {
-            steps {
-                sh 'python3 -m venv venv'
-                sh 'chmod -R 755 venv/bin/'  
-                sh 'make install'
-                sh 'make install-sonar'
-                sh 'venv/bin/pip install pytest'
-            }
-        }
+    steps {
+        sh '''
+            # Remove any existing virtual environment
+            rm -rf venv || true
+            
+            # Create a proper virtual environment with the --copies flag
+            python3 -m venv venv --copies
+            
+            # Set permissions
+            chmod -R 755 venv/bin/
+            
+            # Verify the Python path
+            readlink -f venv/bin/python
+            
+            # Install dependencies
+            venv/bin/pip install --upgrade pip
+            venv/bin/pip install -r requirements.txt
+            venv/bin/pip install pytest --force-reinstall
+            
+            # Verify pytest installation
+            venv/bin/pip list | grep pytest
+        '''
+        sh 'make install-sonar'
+    }
+}
 
         stage('Start MLflow Server') {
             steps {
@@ -40,9 +57,11 @@ pipeline {
 
         stage('Run Tests') {
     steps {
-        sh 'venv/bin/pip install pytest'
-        sh 'venv/bin/python -m pytest tests/unit'
-        sh 'venv/bin/python -m pytest tests/functional'
+        sh '''
+            # Directly run tests with the Python interpreter
+            venv/bin/python -m pytest tests/unit -v
+            venv/bin/python -m pytest tests/functional -v
+        '''
     }
 }
         
