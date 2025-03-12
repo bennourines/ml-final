@@ -117,10 +117,22 @@ pipeline {
         }
 
         stage('Build Docker Image') {
-            steps {
-                sh 'make docker-build'
+    steps {
+        script {
+            // Increase Docker build timeout
+            timeout(time: 30, unit: 'MINUTES') {
+                // Clean up existing images to free space
+                sh 'docker system prune -f || true'
+                
+                // Try direct Docker build command with memory limits
+                sh '''
+                    echo "Building Docker image..."
+                    docker build --memory=2g --memory-swap=2g -t ines253/ines_bennour_mlops .
+                '''
             }
         }
+    }
+}
 
         stage('Push Docker Image') {
             steps {
