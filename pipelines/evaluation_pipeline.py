@@ -2,16 +2,23 @@
 import joblib
 import mlflow
 import numpy as np
+import sys
+import os
 from sklearn.metrics import (
     accuracy_score, 
     classification_report, 
     confusion_matrix,
     roc_curve,
     precision_recall_curve,
-    auc
+    auc,
+    precision_score,
+    recall_score,
+    f1_score
 )
 import matplotlib.pyplot as plt
 import pandas as pd
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+
 from pipelines.mlflow_elastic import get_es_logger
 import json
 import time
