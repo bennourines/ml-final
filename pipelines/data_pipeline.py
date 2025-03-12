@@ -3,10 +3,14 @@ import os
 import joblib
 import pandas as pd
 import numpy as np
+import sys
+import os
 from sklearn.preprocessing import OrdinalEncoder, MinMaxScaler
 import warnings
 import mlflow
-from pipelines.mlflow_elastic import get_es_logger
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+
+from pipelines.mlflow_elastic import get_es_logger 
 
 warnings.filterwarnings("ignore")
 
