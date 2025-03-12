@@ -2,6 +2,8 @@
 import joblib
 import mlflow
 import pandas as pd
+import sys
+import os
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import (
     accuracy_score,
@@ -10,6 +12,8 @@ from sklearn.metrics import (
     f1_score,
     roc_auc_score,
 )
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+
 from pipelines.mlflow_elastic import get_es_logger
 import time
 import json
