@@ -22,8 +22,12 @@ pipeline {
             venv/bin/pip install -r requirements.txt
             venv/bin/pip install pytest --force-reinstall
             
-            # Verify pytest installation
+            # Install elasticsearch package explicitly
+            venv/bin/pip install elasticsearch
+            
+            # Verify installations
             venv/bin/pip list | grep pytest
+            venv/bin/pip list | grep elasticsearch
         '''
         sh 'make install-sonar'
     }
