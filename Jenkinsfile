@@ -92,26 +92,30 @@ pipeline {
 
         stage('Run Tests') {
             steps {
-                sh '''
-                    # Run unit and functional tests using pytest
-                    venv/bin/python -m pytest tests/unit -v
-                    venv/bin/python -m pytest tests/functional -v
-                '''
+                catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
+                    sh '''
+                        # Run unit and functional tests using pytest
+                        venv/bin/python -m pytest tests/unit -v
+                        venv/bin/python -m pytest tests/functional -v
+                    '''
+                }
             }
         }
 
         stage('CODE QUALITY & SECURITY') {
             steps {
-                sh '''
-                    # Run static code analysis tools
-                    venv/bin/python -m pylint **/*.py
-                    venv/bin/python -m flake8 .
-                    venv/bin/python -m mypy .
-                    venv/bin/python -m bandit -r .
+                catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
+                    sh '''
+                        # Run static code analysis tools
+                        venv/bin/python -m pylint **/*.py
+                        venv/bin/python -m flake8 .
+                        venv/bin/python -m mypy .
+                        venv/bin/python -m bandit -r .
 
-                    # Format code using Black
-                    venv/bin/python -m black ..
-                '''
+                        # Format code using Black
+                        venv/bin/python -m black ..
+                    '''
+                }
             }
         }
 
