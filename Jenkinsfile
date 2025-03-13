@@ -5,34 +5,40 @@ pipeline {
         stage('Install Dependencies') {
     steps {
         sh '''
-            # Remove any existing virtual environment
-            rm -rf venv || true
+            # Only create virtual environment if it doesn't exist
+            if [ ! -d "venv" ]; then
+                python3 -m venv venv --copies
+                chmod -R 755 venv/bin/
+            fi
             
-            # Create a proper virtual environment with the --copies flag
-            python3 -m venv venv --copies
+            # Use pip cache and only install if requirements have changed
+            if [ ! -f ".pip_cache_hash" ] || [ "$(md5sum requirements.txt | awk '{print $1}')" != "$(cat .pip_cache_hash)" ]; then
+                echo "Installing dependencies..."
+                venv/bin/pip install --upgrade pip --quiet
+                venv/bin/pip install -r requirements.txt --quiet
+                venv/bin/pip install pytest elasticsearch --quiet
+                
+                # Save hash of requirements.txt for future comparison
+                md5sum requirements.txt | awk '{print $1}' > .pip_cache_hash
+            else
+                echo "Dependencies up to date, skipping installation"
+            fi
             
-            # Set permissions
-            chmod -R 755 venv/bin/
-            
-            # Verify the Python path
-            readlink -f venv/bin/python
-            
-            # Install dependencies
-            venv/bin/pip install --upgrade pip
-            venv/bin/pip install -r requirements.txt
-            venv/bin/pip install pytest --force-reinstall
-            
-            # Install elasticsearch package explicitly
-            venv/bin/pip install elasticsearch
-            
-            # Verify installations
-            venv/bin/pip list | grep pytest
-            venv/bin/pip list | grep elasticsearch
+            # Quick verification of critical packages
+            venv/bin/pip list | grep -E 'pytest|elasticsearch' || true
         '''
-        sh 'make install-sonar'
+        
+        // Conditional execution of sonar installation
+        script {
+            def sonarExists = sh(script: 'which sonar-scanner || echo "not found"', returnStdout: true).trim()
+            if (sonarExists == "not found") {
+                sh 'make install-sonar'
+            } else {
+                echo "Sonar already installed, skipping"
+            }
+        }
     }
 }
-
         stage('Start MLflow Server') {
             steps {
                 sh 'venv/bin/mlflow server --backend-store-uri sqlite:///mlflow.db --default-artifact-root ./mlruns --host 0.0.0.0 --port 5000 &'
