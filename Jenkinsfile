@@ -5,18 +5,30 @@ pipeline {
         stage('Install Dependencies') {
     steps {
         sh '''
-            # Only create virtual environment if it doesn't exist
+            # Remove any existing virtual environment if it has permission issues
+            if [ -d "venv" ] && [ ! -x "venv/bin/pip" ]; then
+                echo "Removing virtual environment with permission issues"
+                rm -rf venv
+            fi
+            
+            # Create virtual environment if it doesn't exist
             if [ ! -d "venv" ]; then
+                echo "Creating new virtual environment"
                 python3 -m venv venv --copies
+                # Fix permissions immediately after creation
                 chmod -R 755 venv/bin/
             fi
             
+            # Double-check permissions regardless
+            echo "Ensuring correct permissions on venv executables"
+            chmod -R 755 venv/bin/
+            
             # Use pip cache and only install if requirements have changed
-            if [ ! -f ".pip_cache_hash" ] || [ "$(md5sum requirements.txt | awk '{print $1}')" != "$(cat .pip_cache_hash)" ]; then
+            if [ ! -f ".pip_cache_hash" ] || [ "$(md5sum requirements.txt | awk '{print $1}')" != "$(cat .pip_cache_hash 2>/dev/null || echo '')" ]; then
                 echo "Installing dependencies..."
-                venv/bin/pip install --upgrade pip --quiet
-                venv/bin/pip install -r requirements.txt --quiet
-                venv/bin/pip install pytest elasticsearch --quiet
+                venv/bin/python -m pip install --upgrade pip --quiet
+                venv/bin/python -m pip install -r requirements.txt --quiet
+                venv/bin/python -m pip install pytest elasticsearch --quiet
                 
                 # Save hash of requirements.txt for future comparison
                 md5sum requirements.txt | awk '{print $1}' > .pip_cache_hash
