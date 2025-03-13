@@ -87,16 +87,8 @@ pipeline {
         '''
     }
 }
-        
-        stage('SonarQube Analysis') {
-            steps {
-                script {
-                    sh 'export PATH=$PATH:/opt/sonar-scanner/bin && make sonar'
-                }
-            }
-        }
 
-        
+
         stage('Data Pipeline') {
             steps {
                 sh 'make data'
