@@ -2,53 +2,34 @@ pipeline {
     agent any
 
     stages {
-        stage('Install Dependencies') {
+         stage('Install Dependencies') {
     steps {
         sh '''
-            # Remove any existing virtual environment if it has permission issues
-            if [ -d "venv" ] && [ ! -x "venv/bin/pip" ]; then
-                echo "Removing virtual environment with permission issues"
-                rm -rf venv
-            fi
+            # Remove any existing virtual environment
+            rm -rf venv || true
             
-            # Create virtual environment if it doesn't exist
-            if [ ! -d "venv" ]; then
-                echo "Creating new virtual environment"
-                python3 -m venv venv --copies
-                # Fix permissions immediately after creation
-                chmod -R 755 venv/bin/
-            fi
+            # Create a proper virtual environment with the --copies flag
+            python3 -m venv venv --copies
             
-            # Double-check permissions regardless
-            echo "Ensuring correct permissions on venv executables"
+            # Set permissions
             chmod -R 755 venv/bin/
             
-            # Use pip cache and only install if requirements have changed
-            if [ ! -f ".pip_cache_hash" ] || [ "$(md5sum requirements.txt | awk '{print $1}')" != "$(cat .pip_cache_hash 2>/dev/null || echo '')" ]; then
-                echo "Installing dependencies..."
-                venv/bin/python -m pip install --upgrade pip --quiet
-                venv/bin/python -m pip install -r requirements.txt --quiet
-                venv/bin/python -m pip install pytest elasticsearch --quiet
-                
-                # Save hash of requirements.txt for future comparison
-                md5sum requirements.txt | awk '{print $1}' > .pip_cache_hash
-            else
-                echo "Dependencies up to date, skipping installation"
-            fi
+            # Verify the Python path
+            readlink -f venv/bin/python
             
-            # Quick verification of critical packages
-            venv/bin/pip list | grep -E 'pytest|elasticsearch' || true
+            # Install dependencies
+            venv/bin/pip install --upgrade pip
+            venv/bin/pip install -r requirements.txt
+            venv/bin/pip install pytest --force-reinstall
+            
+            # Install elasticsearch package explicitly
+            venv/bin/pip install elasticsearch
+            
+            # Verify installations
+            venv/bin/pip list | grep pytest
+            venv/bin/pip list | grep elasticsearch
         '''
-        
-        // Conditional execution of sonar installation
-        script {
-            def sonarExists = sh(script: 'which sonar-scanner || echo "not found"', returnStdout: true).trim()
-            if (sonarExists == "not found") {
-                sh 'make install-sonar'
-            } else {
-                echo "Sonar already installed, skipping"
-            }
-        }
+        sh 'make install-sonar'
     }
 }
         stage('Start MLflow Server') {
