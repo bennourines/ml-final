@@ -132,11 +132,24 @@ pipeline {
                 sh 'make evaluate'
             }
         }
+
+        stage('Prompt Check') {
+            steps {
+                mail to: 'bennourines00@gmail.com',
+                     cc: 'bennourines00@gmail.com',
+                     subject: "INPUT: Build ${env.JOB_NAME}",
+                     body: "Awaiting your input for ${env.JOB_NAME} build no: ${env.BUILD_NUMBER}. Click below to promote to production\n${env.JENKINS_URL}job/${env.JOB_NAME}\n\nView the log at:\n ${env.BUILD_URL}\n\nBlue Ocean:\n${env.RUN_DISPLAY_URL}"
+                
+                timeout(time: 60, unit: 'MINUTES') {
+                    input message: "Promote to Production?", ok: "Promote"
+                }
+            }
+        }
     }
 
     post {
         always {
-            # Clean up to save disk space
+            // Clean up to save disk space
             sh 'docker system prune -f || true'
             sh 'find . -name "__pycache__" -type d -exec rm -rf {} +  || true'
             sh 'find . -name "*.pyc" -delete || true'
@@ -161,19 +174,6 @@ pipeline {
                  cc: 'bennourines00@gmail.com',
                  subject: "ABORTED: Build ${env.JOB_NAME}",
                  body: "Build was aborted ${env.JOB_NAME} build no: ${env.BUILD_NUMBER}\n\nView the log at:\n ${env.BUILD_URL}\n\nBlue Ocean:\n${env.RUN_DISPLAY_URL}"
-        }
-    }
-
-    stage('Prompt Check') {
-        steps {
-            mail to: 'bennourines00@gmail.com',
-                 cc: 'bennourines00@gmail.com',
-                 subject: "INPUT: Build ${env.JOB_NAME}",
-                 body: "Awaiting your input for ${env.JOB_NAME} build no: ${env.BUILD_NUMBER}. Click below to promote to production\n${env.JENKINS_URL}job/${env.JOB_NAME}\n\nView the log at:\n ${env.BUILD_URL}\n\nBlue Ocean:\n${env.RUN_DISPLAY_URL}"
-            
-            timeout(time: 60, unit: 'MINUTES') {
-                input message: "Promote to Production?", ok: "Promote"
-            }
         }
     }
 }
