@@ -1,93 +1,119 @@
 pipeline {
     agent any
-
+    
     stages {
-         stage('Install Dependencies') {
-    steps {
-        sh '''
-            # Remove any existing virtual environment
-            rm -rf venv || true
-            
-            # Create a proper virtual environment with the --copies flag
-            python3 -m venv venv --copies
-            
-            # Set permissions
-            chmod -R 755 venv/bin/
-            
-            # Verify the Python path
-            readlink -f venv/bin/python
-            
-            # Install dependencies
-            venv/bin/pip install --upgrade pip
-            venv/bin/pip install -r requirements.txt
-            venv/bin/pip install pytest --force-reinstall
-            
-            # Install elasticsearch package explicitly
-            venv/bin/pip install elasticsearch
-            
-            # Verify installations
-            venv/bin/pip list | grep pytest
-            venv/bin/pip list | grep elasticsearch
-        '''
-        sh 'make install-sonar'
-    }
-}
+        stage('Install Dependencies') {
+            steps {
+                sh '''
+                    # Remove any existing virtual environment
+                    rm -rf venv || true
+
+                    # Create a proper virtual environment with the --copies flag
+                    python3 -m venv venv --copies
+
+                    # Set permissions
+                    chmod -R 755 venv/bin/
+
+                    # Verify the Python path
+                    readlink -f venv/bin/python
+
+                    # Install dependencies
+                    venv/bin/pip install --upgrade pip
+                    venv/bin/pip install -r requirements.txt
+                    venv/bin/pip install pytest --force-reinstall
+
+                    # Install elasticsearch package explicitly
+                    venv/bin/pip install elasticsearch
+
+                    # Verify installations
+                    venv/bin/pip list | grep pytest
+                    venv/bin/pip list | grep elasticsearch
+                '''
+                sh 'make install-sonar'
+            }
+        }
+
         stage('Start MLflow Server') {
             steps {
-                sh 'venv/bin/mlflow server --backend-store-uri sqlite:///mlflow.db --default-artifact-root ./mlruns --host 0.0.0.0 --port 5000 &'
-                sh 'sleep 10' // Wait for the server to start
+                sh '''
+                    # Start the MLflow server with SQLite backend and default artifact root
+                    venv/bin/mlflow server --backend-store-uri sqlite:///mlflow.db --default-artifact-root ./mlruns --host 0.0.0.0 --port 5000 &
+                    
+                    # Sleep to ensure MLflow server is ready
+                    sleep 10
+                '''
             }
         }
 
         stage('Start Elasticsearch and Kibana') {
-    steps {
-        sh '''
-            # Start Elasticsearch and Kibana
-            docker start elasticsearch kibana || true
-            
-            # Wait for Elasticsearch to be ready
-            echo "Waiting for Elasticsearch to start..."
-            for i in {1..30}; do
-                if curl -s http://localhost:9200 > /dev/null; then
-                    echo "Elasticsearch is up!"
-                    break
-                fi
-                echo "Waiting for Elasticsearch... ($i/30)"
-                sleep 5
-            done
-        '''
-    }
-}
+            steps {
+                sh '''
+                    # Start Elasticsearch and Kibana using Docker
+                    docker start elasticsearch kibana || true
+
+                    # Wait for Elasticsearch to be ready
+                    echo "Waiting for Elasticsearch to start..."
+                    for i in {1..30}; do
+                        if curl -s http://localhost:9200 > /dev/null; then
+                            echo "Elasticsearch is up!"
+                            break
+                        fi
+                        echo "Waiting for Elasticsearch... ($i/30)"
+                        sleep 5
+                    done
+                '''
+            }
+        }
 
         stage('Debug Dependencies') {
             steps {
-                sh 'venv/bin/pip list | grep urllib3'
-                sh 'venv/bin/pip show urllib3'
+                sh '''
+                    # Debugging installed dependencies
+                    venv/bin/pip list | grep urllib3
+                    venv/bin/pip show urllib3
+                '''
             }
         }
-        
+
         stage('Debug Environment') {
-    steps {
-        sh 'pwd'
-        sh 'which python3'
-        sh 'python3 --version'
-        sh 'ls -la venv/bin/'
-        sh 'venv/bin/pip freeze'
-        sh 'venv/bin/python -c "import sys; print(sys.path)"'
-        sh 'find venv -name pytest -type d'
-    }
-}
+            steps {
+                sh '''
+                    # Debugging environment setup
+                    pwd
+                    which python3
+                    python3 --version
+                    ls -la venv/bin/
+                    venv/bin/pip freeze
+                    venv/bin/python -c "import sys; print(sys.path)"
+                    find venv -name pytest -type d
+                '''
+            }
+        }
 
         stage('Run Tests') {
-    steps {
-        sh '''
-            # Directly run tests with the Python interpreter
-            venv/bin/python -m pytest tests/unit -v
-            venv/bin/python -m pytest tests/functional -v
-        '''
-    }
-}
+            steps {
+                sh '''
+                    # Run unit and functional tests using pytest
+                    venv/bin/python -m pytest tests/unit -v
+                    venv/bin/python -m pytest tests/functional -v
+                '''
+            }
+        }
 
+        stage('CODE QUALITY & SECURITY') {
+            steps {
+                sh '''
+                    # Run static code analysis tools
+                    venv/bin/python -m pylint **/*.py
+                    venv/bin/python -m flake8 .
+                    venv/bin/python -m mypy .
+                    venv/bin/python -m bandit -r .
+
+                    # Format code using Black
+                    venv/bin/python -m black ..
+                '''
+            }
+        }
 
         stage('Data Pipeline') {
             steps {
@@ -106,79 +132,48 @@ pipeline {
                 sh 'make evaluate'
             }
         }
-
-        stage('Build Docker Image') {
-    steps {
-        script {
-            // Increase Docker build timeout
-            timeout(time: 30, unit: 'MINUTES') {
-                // Clean up existing images to free space
-                sh 'docker system prune -f || true'
-                
-                // Try direct Docker build command with memory limits
-                sh '''
-                    echo "Building Docker image..."
-                    docker build --memory=2g --memory-swap=2g -t ines253/ines_bennour_mlops .
-                '''
-            }
-        }
-    }
-}
-
-        stage('Push Docker Image') {
-            steps {
-                withCredentials([usernamePassword(credentialsId: 'docker-hub-credentials', usernameVariable: 'DOCKER_HUB_USER', passwordVariable: 'DOCKER_HUB_PASSWORD')]) {
-                    sh 'docker login -u $DOCKER_HUB_USER -p $DOCKER_HUB_PASSWORD'
-                    sh 'make docker-push'
-                }
-            }
-        }
-
-        stage('Deploy') {
-            steps {
-                sh 'make docker-run'
-            }
-        }
     }
 
     post {
         always {
-            // Clean up to save disk space
+            # Clean up to save disk space
             sh 'docker system prune -f || true'
             sh 'find . -name "__pycache__" -type d -exec rm -rf {} +  || true'
             sh 'find . -name "*.pyc" -delete || true'
         }
-        success {
-            emailext (
-                body: """
-                <html>
-                <body>
-                <h2>✅ Pipeline Successful</h2>
-                <p>Build: ${env.BUILD_NUMBER}</p>
-                <p>Check console output at <a href='${env.BUILD_URL}'>${env.JOB_NAME} [${env.BUILD_NUMBER}]</a></p>
-                </body>
-                </html>
-                """,
-                subject: "✅ Pipeline Success: ${env.JOB_NAME} [${env.BUILD_NUMBER}]",
-                to: 'bennourines00@gmail.com',
-                mimeType: 'text/html'
-            )
-        }
+
         failure {
-            emailext (
-                body: """
-                <html>
-                <body>
-                <h2>❌ Pipeline Failed</h2>
-                <p>Build: ${env.BUILD_NUMBER}</p>
-                <p>Check console output at <a href='${env.BUILD_URL}'>${env.JOB_NAME} [${env.BUILD_NUMBER}]</a></p>
-                </body>
-                </html>
-                """,
-                subject: "❌ Pipeline Failed: ${env.JOB_NAME} [${env.BUILD_NUMBER}]",
-                to: 'bennourines00@gmail.com',
-                mimeType: 'text/html'
-            )
+            mail to: 'bennourines00@gmail.com',
+                 cc: 'bennourines00@gmail.com',
+                 subject: "FAILED: Build ${env.JOB_NAME}",
+                 body: "Build failed ${env.JOB_NAME} build no: ${env.BUILD_NUMBER}.\n\nView the log at:\n ${env.BUILD_URL}\n\nBlue Ocean:\n${env.RUN_DISPLAY_URL}"
+        }
+
+        success {
+            mail to: 'bennourines00@gmail.com',
+                 cc: 'bennourines00@gmail.com',
+                 subject: "SUCCESSFUL: Build ${env.JOB_NAME}",
+                 body: "Build Successful ${env.JOB_NAME} build no: ${env.BUILD_NUMBER}\n\nView the log at:\n ${env.BUILD_URL}\n\nBlue Ocean:\n${env.RUN_DISPLAY_URL}"
+        }
+
+        aborted {
+            mail to: 'bennourines00@gmail.com',
+                 cc: 'bennourines00@gmail.com',
+                 subject: "ABORTED: Build ${env.JOB_NAME}",
+                 body: "Build was aborted ${env.JOB_NAME} build no: ${env.BUILD_NUMBER}\n\nView the log at:\n ${env.BUILD_URL}\n\nBlue Ocean:\n${env.RUN_DISPLAY_URL}"
+        }
+    }
+
+    stage('Prompt Check') {
+        steps {
+            mail to: 'bennourines00@gmail.com',
+                 cc: 'bennourines00@gmail.com',
+                 subject: "INPUT: Build ${env.JOB_NAME}",
+                 body: "Awaiting your input for ${env.JOB_NAME} build no: ${env.BUILD_NUMBER}. Click below to promote to production\n${env.JENKINS_URL}job/${env.JOB_NAME}\n\nView the log at:\n ${env.BUILD_URL}\n\nBlue Ocean:\n${env.RUN_DISPLAY_URL}"
+            
+            timeout(time: 60, unit: 'MINUTES') {
+                input message: "Promote to Production?", ok: "Promote"
+            }
         }
     }
 }
